@@ -1,0 +1,78 @@
+[package]
+name = "rustterm-egui"
+version = "0.1.0"
+edition = "2021"
+description = "RustTerm Egui - 全功能终端客户端"
+
+[dependencies]
+eframe = { version = "0.36.2", default-features = false, features = ["default_fonts", "glow"] }
+egui = "0.36.2"
+egui_extras = { version = "0.36.2", features = ["image"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "net", "io-util", "time", "fs"] }
+alacritty_terminal = "0.26.0"
+vte = "0.15"
+portable-pty = "0.8"
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "5"
+log = "0.4"
+env_logger = "0.11"
+rfd = "0.15"
+base64 = "0.22"
+url = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+crossbeam-channel = "0.5"
+async-trait = "0.1"
+once_cell = "1"
+urlencoding = "2"
+
+# 浏览器子窗口定位与 AI 助手 HTTP
+raw-window-handle = "0.6"
+windows-sys = { version = "0.59", features = ["Win32_Foundation", "Win32_UI_WindowsAndMessaging", "Win32_UI_Input_KeyboardAndMouse", "Win32_UI_HiDpi", "Win32_Graphics_Gdi"] }
+ureq = { version = "2", default-features = false, features = ["tls", "json", "gzip"] }
+
+# 远程桌面相关（纯渲染层，后端接口预留）
+# VNC/RDP/SPICE：后端零改动，仅提供帧接收接口与绘制层
+
+# 远程桌面（真实协议实现）
+# VNC：vendor 版 vnc-rs
+vnc-rs = { path = "../rustterm-tauri/vendor/vnc-rs" }
+# SPICE：vendor 版 capsaicin
+capsaicin-client = { path = "../rustterm-tauri/vendor/capsaicin/crates/capsaicin-client" }
+# RDP：vendor 版 IronRDP（Windows 用 native-tls / schannel）
+# 注意：client-clipboard 必须开——vendor 版 ironrdp-client 的
+# `DirectTransport` 导入被 cfg(feature="clipboard") 包住，关掉会编译失败。
+ironrdp = { path = "../rustterm-tauri/vendor/ironrdp/crates/ironrdp", default-features = false, features = [
+    "client", "client-clipboard", "cliprdr", "connector", "core", "input", "pdu", "native-tls"
+] }
+
+# 浏览器内核（wry） - 可选
+wry = { version = "0.47", optional = true }
+
+# 复用主工程已修补的 russh（SHA-1/CBC/des 等旧算法兜底，Jumpserver/老设备兼容）。
+# default-features 关闭：russh 默认启用 aws-lc-rs（其 C 构建 aws-lc-sys 在本机必挂），
+# 只留 ring 后端 + 手动开启的特性。
+russh = { path = "../rustterm-tauri/vendor/russh/russh", default-features = false, features = ["des", "flate2", "ring", "rsa"] }
+# SFTP 子系统（右侧 SFTP 面板需要真实列目录 / 上传下载）
+russh-sftp = { path = "../rustterm-tauri/vendor/russh-sftp" }
+
+[features]
+default = ["browser"]
+browser = ["wry"]
+
+[profile.dev]
+# 环境限制：debug=true 会让 cc 给 MSVC 传 /Z7，随 Rust spawn 触发 cl D8050（见构建日志），
+# 这里统一关掉 dev 的调试信息; 并行提升 egui 编译
+debug = 0
+incremental = true
+
+[profile.dev.package."*"]
+opt-level = 2
+
+# IronRDP 依赖的 picky / sspi 需要主工程的修补版（与 russh 的 ecdsa 版本对齐）
+[patch.crates-io]
+picky = { path = "../rustterm-tauri/vendor/picky" }
+sspi = { path = "../rustterm-tauri/vendor/sspi" }
